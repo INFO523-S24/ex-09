@@ -1,78 +1,229 @@
-# Ex-08: Analyzing Egg Production Trends
+# Ex-09: Time series analysis
 
-## Objective:
+## **Objective:**
 
-Analyze the impact of different housing conditions on egg production using regression models, focusing on understanding the relationship between cage-free percentages and overall production.
+-   Analyze AQI time series data to identify underlying patterns, trends, and seasonality.
 
-**Prerequisites:** Ensure Python, Jupyter Notebook, and necessary libraries (**`pandas`**, **`numpy`**, **`scikit-learn`**, **`matplotlib`**, **`seaborn`**) are installed. The datasets **`egg-production.csv`** and **`cage-free-percentages.csv`** should be accessible in the **`data`** directory.
+-   Apply ARIMA models to forecast future AQI values.
+
+-   Explore and apply detrending methods to examine the time series data without its trend component.
+
+-   Investigate the seasonality in the data, understanding how AQI values change over different times of the year.
+
+### **Prerequisites:**
+
+-   **Software and Libraries:** Ensure Python, Jupyter Notebook, and necessary libraries (**`pandas`**, **`matplotlib`**, **`statsmodels`**, **`pmdarima`**) are installed.
+
+-   **Datasets:** Access to the provided dataset with **`date`** and **`aqi_value`** columns, among others, to perform the analysis.
+
+### **Key Concepts:**
+
+#### Time Series Analysis
+
+-   **Time Series Data:** Data points collected or recorded at specific time intervals.
+
+-   **Trend:** The long-term movement in time series data, showing an increase or decrease in the data over time.
+
+-   **Seasonality:** Regular patterns or cycles of fluctuations in time series data that occur due to seasonal factors.
+
+#### ARIMA Modeling
+
+-   [**ARIMA**](https://en.wikipedia.org/wiki/Autoregressive_integrated_moving_average) **(AutoRegressive Integrated Moving Average):** A popular statistical method for time series forecasting that captures different aspects of the data, including trend and seasonality.
+
+-   **Parameters (p, d, q):**
+
+    -   **`p`**: The number of lag observations included in the model (AR part).
+
+    -   **`d`**: The degree of differencing required to make the time series stationary.
+
+    -   **`q`**: The size of the moving average window (MA part).
+
+#### Stationarity and Differencing
+
+-   **Stationarity:** A characteristic of a time series whose statistical properties (mean, variance) do not change over time.
+
+-   **Differencing:** A method of transforming a time series to make it stationary by subtracting the previous observation from the current observation.
+
+#### Detrending
+
+-   **Detrending:** The process of removing the trend component from a time series to analyze the cyclical and irregular components.
+
+#### Seasonality Analysis
+
+-   **Seasonal Decompose:** A method to separate out the seasonal component from the time series data, allowing for analysis of specific patterns that repeat over fixed periods.
 
 ## Dataset:
 
-The data this week comes from [The Humane League's US Egg Production dataset](https://thehumaneleague.org/article/E008R01-us-egg-production-data) by [Samara Mendez](https://samaramendez.github.io/). Dataset and code is available for this project on OSF at [US Egg Production Data Set](https://osf.io/z2gxn/).
+The data this week comes from the EPA's measurements on air quality for Tucson, AZ core-based statistical area (CBSA) for 2022.
 
-This dataset tracks the supply of cage-free eggs in the United States from December 2007 to February 2021. For TidyTuesday we've used data through February 2021, but the full dataset, with data through the present, is available in the [OSF project](https://osf.io/z2gxn/).
+We'll use the dataset: `ad_aqi_tracker_data-2023.csv`, which includes daily observations on air quality, along with multi-year averages.
 
-> In this project, they synthesize an analysis-ready data set that tracks cage-free hens and the supply of cage-free eggs relative to the overall numbers of hens and table eggs in the United States. The data set is based on reports produced by the United States Department of Agriculture (USDA), which are published weekly or monthly. They supplement these data with definitions and a taxonomy of egg products drawn from USDA and industry publications. The data include flock size (both absolute and relative) and egg production of cage-free hens as well as all table-egg-laying hens in the US, collected to understand the impact of the industry's cage-free transition on hens. Data coverage ranges from December 2007 to February 2021.
+### Metadata for `ad_aqi_tracker_data-2023.csv`**:**
 
-We'll use two datasets: **`egg-production.csv`** and **`cage-free-percentages.csv`**, which include monthly observations of egg production types, housing conditions, and the percentages of cage-free eggs. These datasets provide a unique opportunity to explore the effects of production practices on egg production volumes.
+| Variable             | Class     | Description                          |
+|----------------------|-----------|--------------------------------------|
+| **`Date`**           | DateTime  | Date of observation                  |
+| `AQI Values`         | int       | Air quality index reading            |
+| **`Main Pollutant`** | character | Primary pollutant at time of reading |
+| **`Site Name`**      | character | Name of collection site              |
+| `Site ID`            | character | ID of collection site                |
+| **`Source`**         | double    | Data source                          |
 
-### Metadata for **`egg-production.csv`:**
+***Note**: You will have to change the data type for some columns to match the above.*
 
-| Variable             | Class     | Description                                                          |
-|-----------------|-----------------|---------------------------------------|
-| **`observed_month`** | double    | Month in which observations were collected                           |
-| **`prod_type`**      | character | Type of egg product: hatching, table eggs                            |
-| **`prod_process`**   | character | Production process and housing: cage-free (organic/non-organic), all |
-| **`n_hens`**         | double    | Number of hens                                                       |
-| **`n_eggs`**         | double    | Number of eggs produced                                              |
-| **`source`**         | character | Original USDA report source                                          |
-
-### **Metadata for `cage-free-percentages.csv`:**
-
-| **Variable**         | **Class** | **Description**                                                    |
-|----------------|----------------|----------------------------------------|
-| **`observed_month`** | double    | Month in which observations were collected                         |
-| **`percent_hens`**   | double    | Percentage of cage-free hens relative to all table-egg-laying hens |
-| **`percent_eggs`**   | double    | Percentage of cage-free eggs relative to all table eggs            |
-| **`source`**         | character | Original USDA report source                                        |
-
-(Source: [TidyTuesday](https://github.com/rfordatascience/tidytuesday/blob/master/data/2023/2023-08-15/readme.md))
+(Source: <https://www.airnow.gov/aqi-basics>)
 
 ## **Question:**
 
-How do cage-free production practices influence overall egg production?
+How can we apply ARIMA modeling to forecast future Air Quality Index (AQI) values based on historical data, and what insights can be gained from detrending and analyzing the seasonality in AQI time series data?
 
 ## **Step 1: Setup and Data Preprocessing**
 
-1.  Begin by importing necessary libraries and loading the datasets.
+1.  Load the dataset into a pandas DataFrame.
 
-2.  Merge the datasets on the **`observed_month`** variable and preprocess the data by encoding categorical variables and handling missing values if any.
+2.  Convert the **`date`** column to datetime format and set it as the index of the DataFrame.
 
-## **Step 2: Exploratory Data Analysis (EDA)**
+3.  Convert the `aqi_value` column as needed.
 
-1.  Conduct EDA to understand the distribution of cage-free percentages and their relationship with egg production volumes.
+4.  Plot the **`aqi_value`** time series to visually inspect the data.
 
-2.  Utilize visualizations like scatter plots and histograms to illustrate these relationships.
+```{python}
+import pandas as pd
+import matplotlib.pyplot as plt
+from skimpy import clean_columns
 
-## **Step 3: Model Training**
+# Load the dataset
+df = pd.read_csv('path_to_your_file.csv')
 
-1.  Train regression models to predict **`n_eggs`** using **`percent_hens`** and other relevant variables as predictors.
+# Clean column names
+df = clean_columns(df)
 
-2.  Consider linear regression, ridge regression, and lasso regression for this task. Evaluate the models based on training data.
+# Assign and remove NAs
+df.replace({'.': np.nan, '': np.nan}, inplace = True)
+df.dropna(inplace=True)
 
-## **Step 4: Model Evaluation and Interpretation**
+# Convert 'date' to datetime and set as index
+df['date'] = pd.to_datetime(df['date'])
+df.set_index('date', inplace = True)
 
-1.  Use metrics such as R-squared, Mean Squared Error (MSE), and coefficients analysis to evaluate the performance of your models.
+# Plot the AQI values
+df['aqi_value'].plot(title = 'AQI Time Series')
+plt.ylabel('AQI Value')
+plt.show()
+```
 
-2.  Discuss the significance of cage-free percentages in predicting egg production volumes.
+## **Step 2: Time Series Decomposition**
 
-## **Assignment:**
+1.  Use **`seasonal_decompose`** from the **`statsmodels`** package to decompose the time series into trend, seasonal, and residual components.
 
-1.  Implement the data preprocessing, model training, and evaluation steps.
+2.  Plot the decomposed components to understand the underlying patterns.
 
-2.  Explore the relationship between cage-free percentages and egg production, utilizing the models trained.
+```{python}
+from statsmodels.tsa.seasonal import seasonal_decompose
 
-3.  Reflect on the implications of your findings for the poultry industry, particularly concerning cage-free housing practices.
+# Decompose the time series
+decomposition = seasonal_decompose(df['aqi_value'], model = 'additive')
+
+# Plot the decomposed components
+decomposition.plot()
+plt.show()
+```
+
+## **Part 3: Testing for Stationarity**
+
+1.  Perform an [Augmented Dickey-Fuller](https://en.wikipedia.org/wiki/Augmented_Dickey%E2%80%93Fuller_test) (ADF) test to check the stationarity of the time series.
+
+2.  If the series is not stationary, apply differencing to make it stationary.
+
+```{python}
+from statsmodels.tsa.stattools import adfuller
+
+# Perform Augmented Dickey-Fuller test
+result = adfuller(df['aqi_value'])
+print('ADF Statistic: %f' % result[0])
+print('p-value: %f' % result[1])
+
+# Interpretation
+if result[1] > 0.05:
+    print("Series is not stationary")
+else:
+    print("Series is stationary")
+```
+
+## **Step 4: ARIMA Model**
+
+1.  Use the **`auto_arima`** function from the **`pmdarima`** package to identify the optimal parameters (p,d,q) for the ARIMA model.
+
+2.  Fit an ARIMA model with the identified parameters.
+
+3.  Plot the original vs. fitted values to assess the model's performance.
+
+```{python}
+from pmdarima import auto_arima
+
+# Identify the optimal ARIMA model
+auto_model = auto_arima(df['aqi_value'], start_p = 1, start_q = 1,
+                        test = 'adf',         # use adftest to find optimal 'd'
+                        max_p = 3, max_q = 3, # maximum p and q
+                        m = 1,                # frequency of series
+                        d = None,             # let model determine 'd'
+                        seasonal = False,     # No Seasonality
+                        start_P = 0, 
+                        D = 0, 
+                        trace = True,
+                        error_action = 'ignore',  
+                        suppress_warnings = True, 
+                        stepwise = True)
+
+print(auto_model.summary())
+
+# Fit ARIMA model
+model = auto_model.fit(df['aqi_value'])
+
+# Plot original vs fitted values
+df['fitted'] = model.predict_in_sample()
+df[['aqi_value', 'fitted']].plot(title='Original vs. Fitted Values')
+plt.show()
+```
+
+## **Part 5: Forecasting**
+
+1.  Forecast AQI values for the next 30 days using the fitted ARIMA model.
+
+2.  Plot the forecasted values alongside the historical data to visualize the forecast.
+
+```{python}
+# Forecast the next 30 days
+forecast, conf_int = model.predict(n_periods = 30, return_conf_int = True)
+
+# Plot the forecast
+plt.figure(figsize = (8, 6))
+plt.plot(df.index, df['aqi_value'], label = 'Historical')
+plt.plot(pd.date_range(df.index[-1], periods = 31, closed = 'right'), forecast, label='Forecast')
+plt.fill_between(pd.date_range(df.index[-1], periods = 31, closed = 'right'), conf_int[:, 0], conf_int[:, 1], color = 'red', alpha = 0.3)
+plt.title('AQI Forecast')
+plt.legend()
+plt.show()
+```
+
+## **Part 6: Detrending and Seasonality Analysis**
+
+1.  Explore different detrending methods (e.g., subtracting a moving average, polynomial detrending) using the **`detrend_aqi`** and **`poly_trend`** columns.
+
+2.  Analyze seasonality patterns in the detrended data.
+
+```{python}
+# Detrending using moving average
+df['moving_avg'] = df['aqi_value'].rolling(window = 12).mean()
+df['detrended'] = df['aqi_value'] - df['moving_avg']
+
+# Plot detrended data
+df[['detrended']].plot(title='Detrended AQI Time Series')
+plt.show()
+
+# Assuming seasonality was identified, you can further analyze it,
+# for example, by averaging detrended values by month or another relevant period.
+```
 
 ## **Submission:**
 
